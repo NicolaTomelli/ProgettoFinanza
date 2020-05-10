@@ -1,0 +1,112 @@
+#! Python3
+
+import openpyxl, os
+
+class Progetto(object):
+    def __init__(self, n, v, w):
+        self.name = n
+        self.van = v
+        self.vincolo = w
+    def getName(self):
+        return self.name
+    def getVAN(self):
+        return self.van
+    def getConst(self):
+        return self.vincolo
+    def PIndex(self):
+        return self.getVAN()/self.getConst()
+    def __str__(self):
+        return self.name + ': <' + str(self.van)\
+                 + ', ' + str(self.vincolo)\
+                 + ", " + str(round(self.PIndex(),4)) + '>'
+
+def buildBudget(investimenti, VAN, vincoli):
+    """investimenti, VAN e vincoli sono liste della medesima lunghezza.
+       investimenti: lista di stringhe
+       VAN e vincoli: liste di int e/o float
+       output: lista di progetti"""
+    Budget = []
+    for i in range(len(VAN)):
+        #Ogni progetto (combinazione di investimento, VAN e vincoli) viene aggiunto a una lista
+        Budget.append(Progetto(investimenti[i], VAN[i],
+                          vincoli[i]))
+    return Budget
+
+def greedy(progetti, maxConst, keyFunction):
+    """progetti è una lista, maxConst >= 0,
+         keyFunction funge da filtro per 
+         l'ordinamento degli elementi nella lista"""
+    CopiaProgetti = sorted(progetti, key = keyFunction,
+                            reverse = True)
+    risultato = []
+    TotVAN, TotConst = 0.0, 0.0
+    for i in range(len(CopiaProgetti)):
+        """
+        Si cicla su ogni elemento di CopiaProgetti
+        se il vincolo non viene superato il progetto
+        è aggiunto alla lista risultato.
+        """
+        if (TotConst+CopiaProgetti[i].getConst()) <= maxConst:
+            risultato.append(CopiaProgetti[i])
+            TotConst += CopiaProgetti[i].getConst()
+            TotVAN += CopiaProgetti[i].getVAN()
+
+    return (risultato, TotVAN, TotConst)
+
+
+def runGreedy(progetti, constraint, keyFunction):
+    risultato, TotVAN, Tech = greedy(progetti, constraint, keyFunction)
+    print('Il VAN totale della soluzione è pari a', round(TotVAN, 2), "miloni di $")
+    print('Sono stati assegnati ', int(Tech), "tecnici.")
+    for proj in risultato:
+        """
+        Richiama la funzione __str__ dell'oggetto Progetto e 
+        stampa a schermo quali progetti sono stati considerati
+        """
+        print('   ', proj)
+
+def maxVAN(DaValutare, residuo):
+    """DaValutare è una lista di oggetti, residuo è il vincolo
+       restituisce una lista contente il VAN di una certa combinazione
+        di progetti e la denominazione dei progetti intrapresi"""
+    if DaValutare == [] or residuo == 0:
+        Valutazione = (0, ())
+    elif DaValutare[0].getConst() > residuo:
+        #Viene valutato unicamente il ramo destro
+        Valutazione = maxVAN(DaValutare[1:], residuo)
+    else:
+        nextProj = DaValutare[0]
+        #Valutazione del ramo sinistro
+        withVan, Taken = maxVAN(DaValutare[1:],
+                                     residuo - nextProj.getConst())
+        withVan += nextProj.getVAN()
+        #Valutazione del ramo destro
+        withoutVan, notTaken = maxVAN(DaValutare[1:], residuo)
+        #Comparazione dei due rami
+        if withVan > withoutVan:
+            Valutazione = (withVan, Taken + (nextProj,))
+        else:
+            Valutazione = (withoutVan, notTaken)
+    return Valutazione
+
+def runmaxVAN(progetti, maxConst):
+    TotVAN, Taken = maxVAN(progetti, maxConst)
+    print('Il VAN totale della soluzione è pari a', round(TotVAN,2), "miloni di $")
+    for proj in Taken:
+            print('   ', proj)
+
+os.chdir("C:\\Users\\ntome\\Desktop")
+wb = openpyxl.load_workbook("Dati Progetti.xlsx")
+ws = wb.active
+progetti =[]
+Van = []
+Tecnici = []
+for proj in ws.iter_rows(min_row=2, max_col=3):
+    progetti.append(proj[0].value)
+    Van.append(proj[1].value)
+    Tecnici.append(proj[2].value)
+Elenco = buildBudget(progetti, Van, Tecnici)
+runGreedy(Elenco, 190, Progetto.PIndex)
+print('')
+runmaxVAN(Elenco, 190)
+wb.close()
